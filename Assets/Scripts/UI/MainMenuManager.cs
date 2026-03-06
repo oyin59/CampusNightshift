@@ -18,6 +18,10 @@ namespace UI
         [Header("UI References")]
         [Tooltip("Optional loading screen panel to turn on before async load begins")]
         [SerializeField] private GameObject loadingScreenPanel;
+        
+        [Tooltip("The panel containing the controls and battery locations")]
+        [SerializeField] private GameObject howToPlayPanel;
+
         [Tooltip("The button that starts the game")]
         [SerializeField] private Button playButton;
 
@@ -27,8 +31,9 @@ namespace UI
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            // 2. Hide loading screen and hook up play button
+            // 2. Hide loading screen and HowToPlay panel
             if (loadingScreenPanel != null) loadingScreenPanel.SetActive(false);
+            if (howToPlayPanel != null) howToPlayPanel.SetActive(false);
             
             if (playButton != null)
             {
@@ -39,6 +44,16 @@ namespace UI
             {
                 Debug.LogWarning("MainMenuManager: Play button is not assigned!");
             }
+        }
+
+        public void OpenHowToPlay()
+        {
+            if (howToPlayPanel != null) howToPlayPanel.SetActive(true);
+        }
+
+        public void CloseHowToPlay()
+        {
+            if (howToPlayPanel != null) howToPlayPanel.SetActive(false);
         }
 
         public void OnPlayClicked()
