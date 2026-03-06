@@ -30,6 +30,8 @@ namespace AI
         [SerializeField] private float viewAngle = 90f;
         [Tooltip("The layer mask representing walls so the guard can't see through them.")]
         [SerializeField] private LayerMask obstacleLayer;
+        [Tooltip("How close the guard needs to be to catch the player (meters)")]
+        [SerializeField] private float catchDistance = 1.5f;
 
         [Header("Speed Settings")]
         [SerializeField] private float patrolSpeed = 2f;
@@ -115,13 +117,31 @@ namespace AI
             float distanceToPlayer = Vector3.Distance(transform.position, player.position);
             if (distanceToPlayer <= currentViewDistance)
             {
-                // 2. ANGLE (Field of Vision)
+                // 2. CATCH: Is the player touching the guard (and NOT behind a wall)?
+                if (distanceToPlayer <= catchDistance)
+                {
+                    Vector3 catchEyePosition = transform.position + Vector3.up * 1.5f;
+                    Vector3 catchTargetPos = player.position + Vector3.up * 1.0f;
+
+                    // Only catch them if there is NO wall between us
+                    if (!Physics.Linecast(catchEyePosition, catchTargetPos, obstacleLayer))
+                    {
+                        Systems.GameManager manager = FindObjectOfType<Systems.GameManager>();
+                        if (manager != null)
+                        {
+                            manager.PlayerCaught();
+                        }
+                        return; // Stop checking, they are already caught
+                    }
+                }
+
+                // 3. ANGLE (Field of Vision)
                 Vector3 directionToPlayer = (player.position - transform.position).normalized;
                 float angleToPlayer = Vector3.Angle(transform.forward, directionToPlayer);
 
                 if (angleToPlayer < currentViewAngle / 2f)
                 {
-                    // 3. LINE OF SIGHT: Did it hit a wall?
+                    // 4. LINE OF SIGHT: Did it hit a wall?
                     Vector3 eyePosition = transform.position + Vector3.up * 1.5f;
                     Vector3 targetPos = player.position + Vector3.up * 1.0f;
                     
@@ -149,22 +169,6 @@ namespace AI
                 if (waypoints.Length > 0)
                 {
                     agent.SetDestination(waypoints[currentWaypointIndex].position);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Day 7: Game Over Condition
-        /// If the guard physically touches the player, the game is over.
-        /// </summary>
-        private void OnCollisionEnter(Collision collision)
-        {
-            if (collision.gameObject.CompareTag("Player"))
-            {
-                Systems.GameManager manager = FindObjectOfType<Systems.GameManager>();
-                if (manager != null)
-                {
-                    manager.PlayerCaught();
                 }
             }
         }
