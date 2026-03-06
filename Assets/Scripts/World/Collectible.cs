@@ -34,11 +34,9 @@ namespace World
                 Debug.LogWarning("Collectible: Could not find GameManager to update score!");
             }
 
-            // 2. Play Audio (if we have it, for Day 8)
-            if (pickupSound != null)
-            {
-                AudioSource.PlayClipAtPoint(pickupSound, transform.position);
-            }
+            // 2. Play Audio (Day 8: Using the AudioTriggers manager)
+            AudioTriggers audio = FindObjectOfType<AudioTriggers>();
+            if (audio != null) audio.PlayCollectSound(transform.position);
 
             // 3. Destroy this object so you can't pick it up twice
             Destroy(gameObject);
