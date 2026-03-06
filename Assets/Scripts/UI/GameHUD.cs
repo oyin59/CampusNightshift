@@ -14,6 +14,8 @@ namespace UI
         [SerializeField] private UnityEngine.UI.Image crosshair;
         [Tooltip("The TextMeshPro UI element that shows 'Objectives Remaining: X'")]
         [SerializeField] private TextMeshProUGUI objectivesText;
+        [Tooltip("The TextMeshPro UI element that shows 'Lives: X'")]
+        [SerializeField] private TextMeshProUGUI livesText;
         [Tooltip("Optional panel to show when caught or winning")] // For Day 7
         [SerializeField] private GameObject gameOverPanel;
 
@@ -28,16 +30,28 @@ namespace UI
 
             // 3. Set default text
             UpdateObjectiveText(3); // Assuming 3 objectives to start
+            UpdateLivesText(3); // Assuming 3 lives to start
         }
 
         /// <summary>
-        /// Public method so other scripts (like ObjectiveManager on Day 6) can update the UI.
+        /// Updates the Objectives remaining on screen.
         /// </summary>
         public void UpdateObjectiveText(int remaining)
         {
             if (objectivesText != null)
             {
                 objectivesText.text = $"Objectives Remaining: {remaining}";
+            }
+        }
+
+        /// <summary>
+        /// Updates the Lives remaining on screen.
+        /// </summary>
+        public void UpdateLivesText(int lives)
+        {
+            if (livesText != null)
+            {
+                livesText.text = $"Lives: {lives}";
             }
         }
 
