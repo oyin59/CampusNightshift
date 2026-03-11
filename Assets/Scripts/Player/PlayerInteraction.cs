@@ -55,8 +55,8 @@ namespace Player
                     // 1. Tell the UI to make the crosshair red (Visual Feedback)
                     if (gameHUD != null) gameHUD.SetCrosshairColor(Color.red);
 
-                    // 2. Listen for the E key
-                    if (Input.GetKeyDown(KeyCode.E))
+                    // 2. Listen for the F key (so it doesn't conflict with E to rotate)
+                    if (Input.GetKeyDown(KeyCode.F))
                     {
                         interactableObject.OnInteract();
                     }
