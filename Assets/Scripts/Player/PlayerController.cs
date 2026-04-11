@@ -12,8 +12,24 @@ namespace Player
     {
         [Header("Movement Settings")]
         [SerializeField] private float walkSpeed = 3f;
+        [SerializeField] private float sprintSpeed = 6f;
+        [SerializeField] private float crouchSpeed = 1.5f;
         [SerializeField] private float gravity = -9.81f;
         [SerializeField] private float turnSmoothTime = 0.1f;
+
+        [Header("Noise Settings (Day 3)")]
+        [Tooltip("How much noise the player makes when sprinting")]
+        [SerializeField] private float sprintNoise = 95f;
+        [Tooltip("How much noise the player makes when walking")]
+        [SerializeField] private float walkNoise = 45f;
+        [Tooltip("How much noise the player makes when crouching")]
+        [SerializeField] private float crouchNoise = 10f;
+        [Tooltip("How much noise the player makes when standing still")]
+        [SerializeField] private float idleNoise = 0f;
+        [Tooltip("How quickly the noise meter smooths out")]
+        [SerializeField] private float noiseSmoothSpeed = 5f;
+
+        public float CurrentNoiseLevel { get; private set; }
 
         [Header("Dependencies")]
         [Tooltip("The main camera so movement is relative to where we look.")]
@@ -25,11 +41,13 @@ namespace Player
         private CharacterController controller;
         private float turnSmoothVelocity;
         private Vector3 velocity; // For gravity
+        private float originalHeight; // To remember how tall we are before crouching
 
         private void Awake()
         {
             // Cache the reference to avoid expensive GetComponent calls in Update
             controller = GetComponent<CharacterController>();
+            if (controller != null) originalHeight = controller.height;
 
             if (mainCamera == null)
             {
@@ -50,9 +68,12 @@ namespace Player
         /// </summary>
         private void HandleRotation()
         {
-            // --- STANDARD MOUSE LOOK ---
+            // --- DYNAMIC MOUSE LOOK (Day 5) ---
+            // Grabs the custom sensitivity from the Settings Menu, mapping 45 slider value to the old 200f baseline (4.44x scale)
+            float mouseSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 45f) * 4.44f;
+            
             float mouseX = Input.GetAxis("Mouse X") * turnSmoothTime;
-            transform.Rotate(Vector3.up * mouseX * 200f * Time.deltaTime);
+            transform.Rotate(Vector3.up * mouseX * mouseSensitivity * Time.deltaTime);
 
             // --- ACCESSIBILITY KEYBOARD TURNING (Q / E) ---
             // If the user holds Q, spin left. If E, spin right.
@@ -84,17 +105,46 @@ namespace Player
                 animator.SetFloat("walkingSpeed", inputDirection.magnitude);
             }
 
-            // Only move if there is actual input
+            // ONLY move if there is actual input
+            float targetNoise = idleNoise;
+
             if (inputDirection.magnitude >= 0.1f)
             {
-                // We convert our local WASD input (inputDirection) into World Space based on our current rotation.
-                // This means 'W' (vertical=1) will always push us in the direction we are currently facing, 
-                // and 'S' (vertical=-1) will push us backwards.
-                Vector3 moveDir = transform.TransformDirection(inputDirection);
+                // Dynamic Speed & Noise depending on inputs!
+                float currentSpeed = walkSpeed;
 
-                // Move the character
-                controller.Move(moveDir * walkSpeed * Time.deltaTime);
+                if (Input.GetKey(KeyCode.LeftShift))
+                {
+                    currentSpeed = sprintSpeed;
+                    targetNoise = sprintNoise;
+                }
+                else if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C))
+                {
+                    currentSpeed = crouchSpeed;
+                    targetNoise = crouchNoise;
+                }
+                else
+                {
+                    currentSpeed = walkSpeed;
+                    targetNoise = walkNoise;
+                }
+
+                Vector3 moveDir = transform.TransformDirection(inputDirection);
+                controller.Move(moveDir * currentSpeed * Time.deltaTime);
             }
+
+            // Dynamic Crouching Physically squashes the CharacterController collision box down!
+            if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C))
+            {
+                controller.height = Mathf.Lerp(controller.height, originalHeight / 2f, Time.deltaTime * 6f);
+            }
+            else
+            {
+                controller.height = Mathf.Lerp(controller.height, originalHeight, Time.deltaTime * 6f);
+            }
+
+            // Smoothly calculate current noise level
+            CurrentNoiseLevel = Mathf.Lerp(CurrentNoiseLevel, targetNoise, Time.deltaTime * noiseSmoothSpeed);
         }
 
         /// <summary>
