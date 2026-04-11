@@ -25,6 +25,10 @@ namespace AI
         [SerializeField] private Transform player;
         [Tooltip("How far the guard can see in meters.")]
         [SerializeField] private float viewDistance = 15f;
+        [Tooltip("Distance threshold to trigger the HUD proximity warning.")]
+        [SerializeField] private float proximityWarningDistance = 20f;
+        private bool hasTriggeredProximityWarning = false;
+        
         [Tooltip("The cone of vision (e.g., 90 means 45 degrees left and right of center).")]
         [Range(0, 360)]
         [SerializeField] private float viewAngle = 90f;
@@ -115,6 +119,21 @@ namespace AI
 
             // 1. DISTANCE: Is the player close enough?
             float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+
+            // -- NEW: PROXIMITY WARNING SYSTEM (Day 3) -- //
+            if (distanceToPlayer <= proximityWarningDistance && !hasTriggeredProximityWarning)
+            {
+                hasTriggeredProximityWarning = true;
+                UI.GameHUD hud = FindObjectOfType<UI.GameHUD>();
+                if (hud != null) hud.ShowGuardWarning();
+            }
+            else if (distanceToPlayer > proximityWarningDistance + 5f)
+            {
+                // Reset it only when the player successfully sneaks totally out of range!
+                hasTriggeredProximityWarning = false; 
+            }
+            // ------------------------------------------ //
+
             if (distanceToPlayer <= currentViewDistance)
             {
                 // 2. CATCH: Is the player touching the guard (and NOT behind a wall)?
