@@ -27,6 +27,10 @@ namespace UI
 
         private void Start()
         {
+            // CRITICAL FIX: If the player returned from a Pause or Game Over screen, 
+            // Time.timeScale was left at 0! We must reset it so Main Menu animations run!
+            Time.timeScale = 1f;
+
             // 1. Ensure the cursor is unlocked and visible so the player can click the menu
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -75,11 +79,30 @@ namespace UI
 
             // Begin async operation
             AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(gameSceneName);
+            
+            // Prevent Unity from jumping to the next scene the millisecond it finishes loading
+            // We want to force it to watch our beautiful animation hit 100% first!
+            asyncLoad.allowSceneActivation = false;
 
-            // Wait here until it's done
+            float visualProgress = 0f;
+
+            // Wait until the real load and our fake visual load are both fully finished
             while (!asyncLoad.isDone)
             {
-                // You could update a progress bar here using asyncLoad.progress (0.0 to 1.0)
+                // Unity's load stops at 0.9. We map that back to a 0.0 -> 1.0 target scale.
+                float targetProgress = Mathf.Clamp01(asyncLoad.progress / 0.9f);
+
+                // ANIMATION MAGIC: Smoothly glide our visual progress towards the target progress
+                // Since there are no moving visuals anymore, 5 seconds is perfect to hold the Title Screen.
+                visualProgress = Mathf.MoveTowards(visualProgress, targetProgress, 0.2f * Time.unscaledDeltaTime);
+
+                // If the scene is fully loaded AND our completely 100% finished waiting
+                if (asyncLoad.progress >= 0.9f && visualProgress >= 1f)
+                {
+                    // Unleash the scene transition!
+                    asyncLoad.allowSceneActivation = true;
+                }
+
                 yield return null; 
             }
         }
