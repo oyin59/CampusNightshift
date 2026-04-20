@@ -29,9 +29,31 @@ namespace UI
         [Tooltip("The Slider that visually represents how much noise the player is making")]
         [SerializeField] private UnityEngine.UI.Slider noiseMeterSlider;
         
+        [Header("Full Map (Pause Menu)")]
+        [Tooltip("The parent object for the full-screen map overlay")]
+        [SerializeField] private GameObject fullMapPanel;
+        [SerializeField] private RectTransform fullPlayerDot;
+        [SerializeField] private RectTransform fullGuardDot;
+        [SerializeField] private RectTransform fullMapRect;
+
+        [Header("Mini Map (HUD)")]
+        [Tooltip("The parent object for the corner minimap")]
+        [SerializeField] private GameObject miniMapPanel;
+        [SerializeField] private RectTransform miniPlayerDot;
+        [SerializeField] private RectTransform miniGuardDot;
+        [SerializeField] private RectTransform miniMapRect;
+        
+        [Header("Map Configuration")]
+        [Tooltip("The real-world min/max coordinates of the level")]
+        [SerializeField] private Vector2 worldMin = new Vector2(-50, -50);
+        [SerializeField] private Vector2 worldMax = new Vector2(50, 50);
+        
         private Coroutine batteryRoutine;
         private Coroutine guardRoutine;
         private Player.PlayerController localPlayer;
+        private AI.AgentController guardAI;
+        private World.Collectible[] batteries;
+        private bool isMapOpen = false;
 
         private void Start()
         {
@@ -45,6 +67,8 @@ namespace UI
             // Hide popups by default
             if (batteryNotificationText != null) batteryNotificationText.gameObject.SetActive(false);
             if (guardWarningText != null) guardWarningText.gameObject.SetActive(false);
+            if (fullMapPanel != null) fullMapPanel.SetActive(false);
+            isMapOpen = false;
 
             // 3. Set default text
             UpdateObjectiveText(3); // Assuming 3 objectives to start
@@ -111,17 +135,103 @@ namespace UI
 
         private void Update()
         {
-            // Continuously map the Player's acoustic noise to the UI Slider!
+            // --- NOISE METER ---
             if (noiseMeterSlider != null)
             {
                 if (localPlayer == null) localPlayer = FindObjectOfType<Player.PlayerController>();
                 
                 if (localPlayer != null)
                 {
-                    // Assuming the Slider expects a value between 0.0 and 1.0, and 100 is max noise
                     noiseMeterSlider.value = localPlayer.CurrentNoiseLevel / 100f;
                 }
             }
+
+            // --- MAP TOGGLE ---
+            if (Input.GetKeyDown(KeyCode.M))
+            {
+                SetFullMapVisibility(!isMapOpen);
+            }
+
+            // --- ALL MAP TRACKING ---
+            UpdateMapTrackers();
+        }
+
+        public void SetFullMapVisibility(bool visible)
+        {
+            isMapOpen = visible;
+            if (fullMapPanel != null) fullMapPanel.SetActive(isMapOpen);
+            
+            // If the map is on, unlock the cursor so they can navigate (if it's not already handled by Pause)
+            if (isMapOpen)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+        }
+
+        public void SetMiniMapVisibility(bool visible)
+        {
+            if (miniMapPanel != null) miniMapPanel.SetActive(visible);
+        }
+
+        public void SetTimerVisibility(bool visible)
+        {
+            if (timerText != null) timerText.gameObject.SetActive(visible);
+        }
+
+        private void UpdateMapTrackers()
+        {
+            // Update entities (Player/Guard references)
+            if (localPlayer == null) localPlayer = FindObjectOfType<Player.PlayerController>();
+            if (guardAI == null) guardAI = FindObjectOfType<AI.AgentController>();
+
+            // 1. UPDATE FULL MAP (If active)
+            if (isMapOpen && fullMapRect != null)
+            {
+                if (localPlayer != null && fullPlayerDot != null)
+                    fullPlayerDot.anchoredPosition = WorldToMapSpace(localPlayer.transform.position, fullMapRect);
+                
+                if (guardAI != null && fullGuardDot != null)
+                    fullGuardDot.anchoredPosition = WorldToMapSpace(guardAI.transform.position, fullMapRect);
+            }
+
+            // 2. UPDATE MINI MAP (If active)
+            if (miniMapPanel != null && miniMapPanel.activeSelf && miniMapRect != null)
+            {
+                if (localPlayer != null && miniPlayerDot != null)
+                    miniPlayerDot.anchoredPosition = WorldToMapSpace(localPlayer.transform.position, miniMapRect);
+                
+                if (guardAI != null && miniGuardDot != null)
+                    miniGuardDot.anchoredPosition = WorldToMapSpace(guardAI.transform.position, miniMapRect);
+            }
+        }
+
+        private Vector2 WorldToMapSpace(Vector3 worldPos, RectTransform mapContext)
+        {
+            // Normalize World Coordinates (0.0 to 1.0)
+            float tX = Mathf.InverseLerp(worldMin.x, worldMax.x, worldPos.x);
+            float tY = Mathf.InverseLerp(worldMin.y, worldMax.y, worldPos.z); 
+
+            // Map to UI Rect Space of the specific context (Full or Mini)
+            float uiX = (tX - 0.5f) * mapContext.rect.width;
+            float uiY = (tY - 0.5f) * mapContext.rect.height;
+
+            return new Vector2(uiX, uiY);
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            // This code only runs in the Unity Editor to help you align your map!
+            Gizmos.color = Color.green;
+            
+            Vector3 center = new Vector3((worldMin.x + worldMax.x) / 2f, 1f, (worldMin.y + worldMax.y) / 2f);
+            Vector3 size = new Vector3(worldMax.x - worldMin.x, 2f, worldMax.y - worldMin.y);
+            
+            Gizmos.DrawWireCube(center, size);
+            
+            // Draw corners
+            Gizmos.DrawSphere(new Vector3(worldMin.x, 1f, worldMin.y), 0.5f);
+            Gizmos.DrawSphere(new Vector3(worldMax.x, 1f, worldMax.y), 0.5f);
         }
 
         // --- NOTIFICATION FLYOUTS --- //

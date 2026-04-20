@@ -14,6 +14,7 @@ namespace Systems
     {
         public float bestTime = float.MaxValue;
         public int lifetimeBatteries = 0;
+        public int lastUnlockedLevel = 1; // 1 = Level 1, 2 = Level 2, etc.
     }
 
     /// <summary>
@@ -53,16 +54,40 @@ namespace Systems
         [SerializeField] private TextMeshProUGUI winCurrentTimeText;
         [Tooltip("The text box showing Rank (e.g. 'S')")]
         [SerializeField] private TextMeshProUGUI winRankText;
+        [Tooltip("The text box showing the total number of times the player was caught on the Win Screen")]
+        [SerializeField] private TextMeshProUGUI winTimesCaughtText;
+        [Tooltip("A UI Panel that pops up to celebrate a new high score before the Win screen appears")]
+        [SerializeField] private GameObject newHighScorePanel;
+
+        [Header("Night Summary Screen (Level 2 Finale)")]
+        [SerializeField] private GameObject nightSummaryPanel;
+        [SerializeField] private TextMeshProUGUI summaryBestTimeText;
+        [SerializeField] private TextMeshProUGUI summaryTotalTimeText;
+        [SerializeField] private TextMeshProUGUI summaryObjectivesText;
+        [SerializeField] private TextMeshProUGUI summaryTotalCatchesText;
+        [SerializeField] private TextMeshProUGUI summaryRankText;
         [Space(10)]
         [SerializeField] private TextMeshProUGUI loseBatteriesText;
         [SerializeField] private TextMeshProUGUI loseRemainingText;
         [SerializeField] private TextMeshProUGUI loseTimesCaughtText;
+
+        [Header("Level Flow")]
+        [Tooltip("The names of the scenes in order (Level 1, Level 2...)")]
+        [SerializeField] private string[] levelSequence = { "GameLevel", "GameLevel_2" };
+        [SerializeField] private GameObject nextLevelButton; // Button to show instead of Main Menu on Win Panel
+
+        [Header("Developer Tools (Demo Use)")]
+        [Tooltip("The main camera attached to the player")]
+        [SerializeField] private Camera mainPlayerCamera;
+        [Tooltip("The overhead Dev Camera to show the whole map")]
+        [SerializeField] private Camera devGodCamera;
 
         private int collectedObjectives = 0;
         private int currentLives;
         private bool isGameOver = false;
         private bool isPaused = false;
         private bool isIntroActive = false;
+        private bool isRecentlyCaught = false; // Prevents being caught multiple times in one frame
 
         private float startTime;
         
@@ -90,6 +115,8 @@ namespace Systems
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
             if (winPanel != null) winPanel.SetActive(false);
+            if (newHighScorePanel != null) newHighScorePanel.SetActive(false);
+            if (nightSummaryPanel != null) nightSummaryPanel.SetActive(false);
 
             // Handle the Intro Screen if we have one
             if (introScreenPanel != null)
@@ -97,9 +124,15 @@ namespace Systems
                 introScreenPanel.SetActive(true);
                 isIntroActive = true;
                 Time.timeScale = 0f; // Freeze game until they press a key
+                if (gameHUD != null) 
+                {
+                    gameHUD.SetMiniMapVisibility(false); // Hide minimap while intro is up
+                    gameHUD.SetTimerVisibility(false);
+                }
             }
 
             // Initialize the UI on spawn
+            isRecentlyCaught = false;
             UpdateUI();
         }
 
@@ -132,6 +165,11 @@ namespace Systems
                 {
                     isIntroActive = false;
                     if (introScreenPanel != null) introScreenPanel.SetActive(false);
+                    if (gameHUD != null) 
+                    {
+                        gameHUD.SetMiniMapVisibility(true); // Show minimap when gameplay starts
+                        gameHUD.SetTimerVisibility(true); // Show timer
+                    }
                     Time.timeScale = 1f; // Let the physics and game begin!
                     startTime = Time.time; // Reset the stopwatch so it starts exactly from 00:00!
                 }
@@ -148,6 +186,18 @@ namespace Systems
                 else
                 {
                     PauseGame();
+                }
+            }
+
+            // Developer God-View Toggle (Press 'V')
+            if (Input.GetKeyDown(KeyCode.V) && !isPaused && !isIntroActive)
+            {
+                if (mainPlayerCamera != null && devGodCamera != null)
+                {
+                    bool isDevActive = devGodCamera.gameObject.activeSelf;
+                    // Toggle exactly the opposite!
+                    devGodCamera.gameObject.SetActive(!isDevActive);
+                    mainPlayerCamera.gameObject.SetActive(isDevActive);
                 }
             }
 
@@ -188,12 +238,12 @@ namespace Systems
         /// </summary>
         public void PlayerCaught()
         {
-            if (isGameOver) return;
+            if (isGameOver || isRecentlyCaught) return;
             
+            isRecentlyCaught = true;
             currentLives--;
 
-            // NEW FIX: Force it to find the HUD again just in case 
-            if (gameHUD == null) gameHUD = FindObjectOfType<GameHUD>();
+            // Refresh HUD UI
             UpdateUI();
 
             // RUBRIC: Audio Triggers - Play scare sound
@@ -204,6 +254,7 @@ namespace Systems
             {
                 Debug.Log($"You were caught! Lives remaining: {currentLives}. Respawning...");
                 RespawnPlayer();
+                StartCoroutine(CatchCooldownRoutine());
             }
             else
             {
@@ -213,6 +264,13 @@ namespace Systems
                 // Wait a brief moment before vanishing so the player processes the jumpscare
                 StartCoroutine(RestartLevelDelay());
             }
+        }
+
+        private System.Collections.IEnumerator CatchCooldownRoutine()
+        {
+            // Wait 1.5 seconds after being caught before you can be caught again
+            yield return new WaitForSeconds(1.5f);
+            isRecentlyCaught = false;
         }
 
         private void RespawnPlayer()
@@ -249,6 +307,16 @@ namespace Systems
 
             // Pop the Game Over Menu instead of just reloading instantly
             if (gameOverPanel != null) gameOverPanel.SetActive(true);
+            if (gameHUD != null) 
+            {
+                gameHUD.SetMiniMapVisibility(false); // Hide the minimap
+                gameHUD.SetTimerVisibility(false);
+            }
+            
+            // Sync current level to save data on failure too just in case
+            currentSaveData.lastUnlockedLevel = GetCurrentLevelIndex() + 1;
+            SaveGameData();
+
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             Time.timeScale = 0f; // Freeze the game in the background
@@ -289,25 +357,161 @@ namespace Systems
             if (winCurrentTimeText != null) winCurrentTimeText.text = currentTimeString;
             if (winPreviousBestText != null) winPreviousBestText.text = bestTimeString;
             if (winRankText != null) winRankText.text = rank;
+            if (winTimesCaughtText != null) winTimesCaughtText.text = $"{timesCaught}x";
 
             // RUBRIC: Save and reload state from file (10 points)
+            int currentLevel = GetCurrentLevelIndex() + 1;
+            if (currentLevel >= currentSaveData.lastUnlockedLevel)
+            {
+                currentSaveData.lastUnlockedLevel = currentLevel + 1;
+            }
+
+            bool isNewHighScore = false;
             if (timeToWin < currentSaveData.bestTime)
             {
                 currentSaveData.bestTime = timeToWin;
-                SaveGameData();
+                isNewHighScore = true;
                 Debug.Log($"NEW HIGH SCORE! Completed in {timeToWin:F2} seconds and saved to JSON!");
             }
+            SaveGameData();
             
+            // Check if there is a next level
+            bool hasNextLevel = currentLevel < levelSequence.Length;
+            
+            // --- NIGHT SUMMARY TRACKING ---
+            if (hasNextLevel)
+            {
+                // Save Level 1 stats to pass to Level 2
+                PlayerPrefs.SetFloat("L1_Time", timeToWin);
+                PlayerPrefs.SetInt("L1_Catches", timesCaught);
+                PlayerPrefs.Save();
+            }
+            else
+            {
+                // This is the final level! Prepare the Night Summary stats.
+                float l1Time = PlayerPrefs.GetFloat("L1_Time", 0f);
+                int l1Catches = PlayerPrefs.GetInt("L1_Catches", 0);
+                
+                float totalNightTime = l1Time + timeToWin;
+                int totalNightCatches = l1Catches + timesCaught;
+
+                // Format the Total Night Time
+                int nMinutes = Mathf.FloorToInt(totalNightTime / 60F);
+                int nSeconds = Mathf.FloorToInt(totalNightTime - nMinutes * 60);
+
+                // Calculate Grand Rank
+                string grandRank = "C";
+                if (totalNightTime < 240f && totalNightCatches == 0) grandRank = "S";
+                else if (totalNightTime < 360f && totalNightCatches <= 2) grandRank = "A";
+                else if (totalNightTime < 480f && totalNightCatches <= 4) grandRank = "B";
+
+                // Map to UI
+                if (summaryTotalTimeText != null) summaryTotalTimeText.text = string.Format("{0:0}:{1:00}", nMinutes, nSeconds);
+                if (summaryTotalCatchesText != null) summaryTotalCatchesText.text = $"{totalNightCatches}x";
+                if (summaryRankText != null) summaryRankText.text = grandRank;
+                
+                // Extra 2 Fields to match your custom grid exactly!
+                if (summaryObjectivesText != null) summaryObjectivesText.text = "8 / 8"; // Total items in the entire game (3+5)
+                
+                if (summaryBestTimeText != null)
+                {
+                    if (currentSaveData.bestTime < float.MaxValue)
+                    {
+                        int bMinutes = Mathf.FloorToInt(currentSaveData.bestTime / 60F);
+                        int bSeconds = Mathf.FloorToInt(currentSaveData.bestTime - bMinutes * 60);
+                        summaryBestTimeText.text = string.Format("{0:0}:{1:00}", bMinutes, bSeconds);
+                    }
+                    else
+                    {
+                        summaryBestTimeText.text = "NONE";
+                    }
+                }
+            }
+
+            if (nextLevelButton != null) nextLevelButton.SetActive(hasNextLevel);
+
             // Unlock cursor so they can click Main Menu buttons
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             Time.timeScale = 0f; // Freeze the game in the background
 
-            // Pop the Win/Mission Complete UI Panel
+            if (gameHUD != null) 
+            {
+                gameHUD.SetMiniMapVisibility(false); // Hide the minimap
+                gameHUD.SetTimerVisibility(false);
+            }
+
+            if (isNewHighScore && newHighScorePanel != null)
+            {
+                StartCoroutine(ShowHighScorePopupRoutine());
+            }
+            else
+            {
+                // Pop the Win/Mission Complete UI Panel
+                if (winPanel != null) winPanel.SetActive(true);
+            }
+        }
+
+        private System.Collections.IEnumerator ShowHighScorePopupRoutine()
+        {
+            // Show the celebration popup
+            if (newHighScorePanel != null) newHighScorePanel.SetActive(true);
+            
+            // Wait 3 seconds in real-time (because Time.timeScale is currently 0)
+            yield return new WaitForSecondsRealtime(3.0f);
+            
+            // Hide the popup and show the actual win screen
+            if (newHighScorePanel != null) newHighScorePanel.SetActive(false);
             if (winPanel != null) winPanel.SetActive(true);
         }
 
+        public void LoadNextLevel()
+        {
+            int currentLvl = GetCurrentLevelIndex();
+            if (currentLvl + 1 < levelSequence.Length)
+            {
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(levelSequence[currentLvl + 1]);
+            }
+            else
+            {
+                QuitToMainMenu();
+            }
+        }
+
+        private int GetCurrentLevelIndex()
+        {
+            string currentScene = SceneManager.GetActiveScene().name;
+            for (int i = 0; i < levelSequence.Length; i++)
+            {
+                if (levelSequence[i] == currentScene) return i;
+            }
+            return 0;
+        }
+
         // --- NEW BUTTON METHODS FOR THE UI --- //
+
+        public void OpenNightSummary()
+        {
+            if (winPanel != null) winPanel.SetActive(false);
+            if (nightSummaryPanel != null) nightSummaryPanel.SetActive(true);
+        }
+
+        public void PlayAgain()
+        {
+            Time.timeScale = 1f; // CRITICAL: Reset time back to normal before reloading!
+            
+            // Clear stats for a fresh run
+            PlayerPrefs.SetFloat("L1_Time", 0f);
+            PlayerPrefs.SetInt("L1_Catches", 0);
+            PlayerPrefs.Save();
+            
+            // Force load Level 1
+            if (levelSequence.Length > 0)
+            {
+                SceneManager.LoadScene(levelSequence[0]);
+            }
+        }
 
         public void ResumeGame()
         {
@@ -315,6 +519,12 @@ namespace Systems
             Time.timeScale = 1f; // Unfreeze the game physics
             
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
+            if (gameHUD != null) 
+            {
+                gameHUD.SetFullMapVisibility(false); // Hide the large map when resuming
+                gameHUD.SetMiniMapVisibility(true);  // Show the minimap
+                gameHUD.SetTimerVisibility(true);    // Show the timer
+            }
             
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
@@ -326,6 +536,12 @@ namespace Systems
             Time.timeScale = 0f; // Freeze the game physics
             
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(true);
+            if (gameHUD != null) 
+            {
+                gameHUD.SetFullMapVisibility(true); // Automatically show the large map when pausing
+                gameHUD.SetMiniMapVisibility(false); // Hide the minimap
+                gameHUD.SetTimerVisibility(false);   // Hide the timer
+            }
             
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -345,10 +561,13 @@ namespace Systems
 
         private void UpdateUI()
         {
+            if (gameHUD == null) gameHUD = FindObjectOfType<GameHUD>();
+            
             if (gameHUD != null)
             {
                 int remaining = totalObjectives - collectedObjectives;
                 gameHUD.UpdateObjectiveText(remaining);
+                gameHUD.UpdateLivesText(currentLives);
             }
         }
     }

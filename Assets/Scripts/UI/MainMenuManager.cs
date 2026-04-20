@@ -14,6 +14,10 @@ namespace UI
         [Header("Scene Settings")]
         [Tooltip("The exact name of your main gameplay scene (e.g., 'GameLevel')")]
         [SerializeField] private string gameSceneName = "GameLevel";
+        
+        [Header("Save Data Integration")]
+        [Tooltip("The names of the levels in the same order as GameManager")]
+        [SerializeField] private string[] levelList = { "GameLevel", "GameLevel_2" };
 
         [Header("UI References")]
         [Tooltip("Optional loading screen panel to turn on before async load begins")]
@@ -77,8 +81,25 @@ namespace UI
             // Show loading screen if assigned
             if (loadingScreenPanel != null) loadingScreenPanel.SetActive(true);
 
+            // --- SAVE FILE LOGIC ---
+            string finalSceneToLoad = gameSceneName;
+            string savePath = Application.persistentDataPath + "/CampusNightShift_Save.json";
+            
+            if (System.IO.File.Exists(savePath))
+            {
+                string json = System.IO.File.ReadAllText(savePath);
+                // We use a simple JSON wrapper to just get the level index
+                var data = JsonUtility.FromJson<Systems.GameSaveData>(json);
+                int index = data.lastUnlockedLevel - 1; // 1-indexed to 0-indexed
+                
+                if (index >= 0 && index < levelList.Length)
+                {
+                    finalSceneToLoad = levelList[index];
+                }
+            }
+
             // Begin async operation
-            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(gameSceneName);
+            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(finalSceneToLoad);
             
             // Prevent Unity from jumping to the next scene the millisecond it finishes loading
             // We want to force it to watch our beautiful animation hit 100% first!
@@ -111,6 +132,10 @@ namespace UI
         {
             Debug.Log("Quitting Game...");
             Application.Quit();
+            
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#endif
         }
     }
 }

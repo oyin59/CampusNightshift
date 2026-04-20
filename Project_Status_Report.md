@@ -49,9 +49,22 @@ The Guard character (Mixamo) utilizes an `Animator` component with the following
 
 ---
 
-## 5. What's Broken or Incomplete (Pending Fixes)
-While the prototype is fully playable from start to finish (Win and Lose states both function correctly), there are a few lingering edges left for the polish phase:
-*   **Door Physics**: Opening doors while standing too close to them can cause the Player's `CharacterController` to violently collide with the swinging door collider, sometimes pushing the player out of bounds or causing jitter. (The temporary workaround is standing back when pressing 'F').
-*   **Lives UI Visual Update Glitch**: The `GameManager` accurately deducts lives and respawns the player, but if the SpawnPoint is placed too close to the Guard's patrol path, the player is instantly 'caught' multiple times in a single frame before the UI has a chance to visually update from 3 to 2.
-*   **Footstep Audio**: The Player and the Guard currently glide silently. Footstep audio events need to be synced to their walk animation frames.
-*   **Minimap**: Discussed but not yet implemented. Requires a secondary Orthographic camera rendering to a Render Texture.
+## 5. Recently Implemented Polish & Fixes
+*   **Dual-Map System**: Refined the map logic into two specific modes. A small **Minimap** is now visible on the HUD during gameplay, and a **Full-screen Map** automatically appears when the game is paused (ESC). Both maps use the architectural blueprint and track player/guard positions.
+*   **Map Calibration Tool**: Developed a custom Unity Editor Utility (`MapCalibrator.cs`) that allows for perfect manual alignment of the minimap tracking coordinates by snapping box-bounds to the edge of the 3D level architecture.
+*   **Multi-Level Progression**: Added `GameLevel_2`. The game now supports unlocking and progressing through multiple levels, saving your progress automatically to a JSON file. Level 2 features a higher difficulty (5 batteries) and a faster Security Guard.
+*   **Sprinting Mechanic**: Added a sprinting function. Holding `Left Shift` or `R` doubles the player's animation speed and actual movement speed while simultaneously increasing their noise emission to 95%.
+*   **Night Summary Page**: Implemented a cross-level tracking system. When the final level is completed, the game calculates the combined Total Time and Total Catches across your entire session, displaying a final operation UI with a grand rank.
+*   **Win Screen & Stats Fix**: Corrected the logic for the Mission Complete screen. It now accurately displays "Time Spent," the number of times you were caught, and compare your time against your "Best Time" saved on your computer. If a high score is broken, a celebratory "New High Score!" window will pop up for 3 seconds.
+*   **UI Visibility Sync**: The HUD Timer and Minimap are now dynamically hidden during the Intro, Pause Menu, and Game Over states to keep the player's screen visually uncluttered.
+*   **Catch Cooldown**: Implemented a 1.5-second invulnerability/cooldown window after being caught to prevent the "frame-lock" glitch where a player could be caught multiple times instantly during a respawn.
+
+---
+
+## 6. Final Assessment Checklist
+✔ **Menu and in-game UI**: Main Menu, Game HUD, and Win/Lose Panels are fully functional.
+✔ **Several game levels**: Level 1 (3 items) and Level 2 (starts in Bathroom, 5 items) are implemented.
+✔ **Non-player character**: NavMesh-driven Security Guard with detection logic is active.
+✔ **Save and reload game state**: Progression and high scores are saved to `CampusNightShift_Save.json`.
+✔ **Keep and save user score**: Lifetime batteries and Best Times are tracked.
+✔ **Audio (Bonus)**: Ambient music and event-triggered sounds are implemented.

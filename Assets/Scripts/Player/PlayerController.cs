@@ -102,7 +102,9 @@ namespace Player
             // Update Animator (Lab 5 requirement: 'walkingSpeed')
             if (animator != null)
             {
-                animator.SetFloat("walkingSpeed", inputDirection.magnitude);
+                float animSpeed = inputDirection.magnitude;
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.R)) animSpeed *= 2.0f; // Speed up animation when running
+                animator.SetFloat("walkingSpeed", animSpeed);
             }
 
             // ONLY move if there is actual input
@@ -113,7 +115,7 @@ namespace Player
                 // Dynamic Speed & Noise depending on inputs!
                 float currentSpeed = walkSpeed;
 
-                if (Input.GetKey(KeyCode.LeftShift))
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.R))
                 {
                     currentSpeed = sprintSpeed;
                     targetNoise = sprintNoise;

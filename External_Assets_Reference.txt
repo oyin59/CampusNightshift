@@ -1,0 +1,24 @@
+Campus Night Shift - External Assets & Code Reuse Statement
+
+As per the coursework submission guidelines, the following is a list of all 3rd party assets and external code used in the creation of this project.
+
+1. 3D MODELS & ANIMATIONS
+- Security Guard Character Model: Unity Asset Store
+- Security Guard Animations (Idle, Walk, Run): Unity Asset Store
+- Level Architecture / School Environment: Unity Asset Store
+- Battery/Collectible Model: Unity Asset Store
+
+2. AUDIO & SOUND EFFECTS
+- Ambient Background Music: Unity Asset Store
+- Collectible Ping Sound: Unity Asset Store
+- Guard Jumpscare Sound: Unity Asset Store
+
+3. UI & VISUAL ASSETS
+- User Interface Icons (Crosshair, Battery Icon): Custom created by author
+- UI Panels and Backgrounds: Custom created by author
+- UI Fonts (TextMeshPro compatible): Font Squirrel
+
+4. CODE REUSE & ACKNOWLEDGEMENT
+- Map Calibration Tool & Night Summary Logic: Logic assisted by external coding resources (AI/Documentation) to fit custom requirements.
+- Standard Third-Person Controller: Adapted from Unity Standard Assets for basic WASD movement logic.
+- All core game state logic (GameManager), AI detection logic (AgentController), and dual-map coordination (GameHUD) were custom-written natively in C# for this project.
